@@ -1,0 +1,6 @@
+{
+  "name": "DID Wallet",
+  "description": "Decentralized Professional Identity and Credential Wallet",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
