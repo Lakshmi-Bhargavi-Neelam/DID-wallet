@@ -1,4 +1,4 @@
-# PRO-DID — Decentralized Identity Wallet
+# Decentralized Identity Wallet
 
 ## Overview
 
