@@ -1,197 +1,382 @@
 # PRO-DID — Decentralized Identity Wallet
 
-A full-stack self-sovereign identity (SSI) system built on EVM-compatible smart contracts.
-Users can register W3C-style Decentralized Identifiers (DIDs), trusted institutions can issue and revoke verifiable credentials, and anyone can verify a credential's authenticity on-chain — with zero gas cost for the verifier.
+## Overview
+
+**PRO-DID** is a blockchain-based Decentralized Identity (DID) Wallet designed to modernize the background verification process through secure, tamper-proof digital credentials. The platform enables trusted organizations to issue verifiable credentials that users fully own and manage, while allowing verifiers to instantly validate their authenticity and integrity without repeatedly contacting the issuing organization.
+
+The primary objective of this project is to **reduce the time, cost, and complexity of manual background verification** by replacing paper-based verification with cryptographically verifiable digital credentials.
 
 ---
 
-## Architecture
+# Problem Statement
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        Frontend (React)                     │
-│  WalletContext ──► contractClient.ts ──► ethers v6          │
-│                                │                            │
-│         localStorage fallback (simulation mode)             │
-└────────────────────────────────┼────────────────────────────┘
-                                 │ JSON-RPC
-┌────────────────────────────────▼────────────────────────────┐
-│                    Anvil / EVM Node                         │
-│                                                             │
-│  DIDRegistry          IssuerRegistry     CredentialRegistry │
-│  ─────────────        ─────────────      ────────────────── │
-│  createDID()          registerIssuer()   issueCredential()  │
-│  hasDID()             removeIssuer()     revokeCredential()  │
-│  getDIDByController() isTrustedIssuer()  verifyCredential()  │
-│  resolveDID()         getIssuer()        getCredential()     │
-└─────────────────────────────────────────────────────────────┘
-                                 │
-                          IPFS (Pinata)
-                    full credential documents
-```
+Background verification is an essential process in recruitment, admissions, professional licensing, and many other domains. However, the current verification process is still largely manual.
 
-### Smart Contracts
+Organizations typically verify a person's credentials by contacting the issuing institution directly through emails, phone calls, or physical document verification. This process introduces several challenges:
 
-| Contract | Description |
-|---|---|
-| `DIDRegistry` | Anchors `did:wallet:<id>` identifiers on-chain. One DID per address. |
-| `IssuerRegistry` | Owner-controlled whitelist of trusted credential issuers. Soft-delete preserves history. |
-| `CredentialRegistry` | Issues, revokes, and verifies credentials. Stores IPFS CID + document hash. Verification is a free view call. |
+- Long verification turnaround times
+- High operational costs
+- Repetitive communication between organizations
+- Increased chances of forged or manipulated documents
+- Lack of a standardized verification mechanism
+- Poor user control over personal credentials
 
-### Frontend
-
-React 19 + TypeScript + Tailwind CSS + ethers v6.
-
-Three role-gated views:
-- **Holder** — create DID, view/verify credentials
-- **Issuer** — issue and revoke credentials
-- **Admin** — register/manage trusted issuers
-
-The frontend auto-detects whether MetaMask and contract addresses are configured.
-If not, it runs in **simulation mode** using localStorage — so the UI is fully explorable without a running node.
+As a result, both organizations and individuals spend significant time waiting for credential verification before important decisions can be made.
 
 ---
 
-## Tech Stack
+# Real-World Challenges Addressed
 
-- **Solidity 0.8.24** — smart contracts
-- **Foundry** — build, test, deploy (Forge + Anvil + Cast)
-- **React 19 + TypeScript** — frontend
-- **ethers v6** — contract interaction
-- **Tailwind CSS v4** — styling
-- **Vite** — frontend bundler
+PRO-DID focuses on solving several real-world challenges that exist in today's identity verification ecosystem.
 
----
+### Manual Background Verification
 
-## Local Development
+Most organizations manually verify educational certificates, employment records, and professional certifications.
 
-### Prerequisites
+This process may take several days or even weeks.
 
-- [Foundry](https://book.getfoundry.sh/getting-started/installation) (`forge`, `anvil`, `cast`)
-- Node.js 18+ and npm
-- MetaMask browser extension (optional — simulation mode works without it)
-
-### One-command setup
-
-```bash
-make setup
-```
-
-This will:
-1. Build the Solidity contracts
-2. Start Anvil in the background
-3. Deploy all three contracts
-4. Write contract addresses to `did-wallet-frontend/.env`
-5. Install frontend dependencies
-
-Then start the frontend:
-
-```bash
-make frontend
-```
-
-### Manual steps
-
-```bash
-# 1. Build contracts
-forge build
-
-# 2. Run tests
-forge test -v
-
-# 3. Start local node (in a separate terminal)
-anvil
-
-# 4. Deploy contracts
-# Copy the private key from Anvil's output (account #0)
-PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast
-
-# 5. Copy the addresses from deployment.json into the frontend .env
-cp did-wallet-frontend/.env.example did-wallet-frontend/.env
-# Then fill in VITE_DID_REGISTRY_ADDRESS, VITE_ISSUER_REGISTRY_ADDRESS,
-# and VITE_CREDENTIAL_REGISTRY_ADDRESS from deployment.json
-
-# 6. Install and run the frontend
-cd did-wallet-frontend
-npm install
-npm run dev
-```
-
-Open http://localhost:3000 and connect MetaMask to `http://localhost:8545` (chain ID 31337).
+PRO-DID enables instant verification through blockchain-backed credentials.
 
 ---
 
-## Contract Tests
+### Document Fraud
 
-```bash
-forge test -v
-```
+Paper certificates and digital PDFs can be edited or forged.
 
-```
-[PASS] test_CreateDID_SetsHasDIDToTrue()
-[PASS] test_HasDID()
-[PASS] test_GetDIDByController()
-[PASS] test_ResolveDID()
-[PASS] test_CreateDID_RevertIf_AlreadyHasDID()
-[PASS] test_CreateDID_RevertIf_EmptyIdentifier()
-[PASS] test_CreateDID_RevertIf_DIDAlreadyExists()
-[PASS] test_GetDIDByController_RevertIf_DIDNotFound()
-[PASS] test_BuildDID()
-[PASS] test_IssueCredential()
-[PASS] test_VerifyCredential()
-[PASS] test_GetCredential()
-[PASS] test_GetCredentialsByHolder()
-[PASS] test_GetCredentialsByIssuer()
-[PASS] test_GetDID_Issuer_Registries()
-[PASS] test_IssueCredential_RevertIf_NotTrustedIssuer()
-[PASS] test_IssueCredential_RevertIf_HolderHasNoDID()
+PRO-DID stores cryptographic hashes of credential documents on the blockchain, making any modification immediately detectable.
+
+---
+
+### Repeated Verification Requests
+
+The same certificate is often verified multiple times by different organizations.
+
+Instead of contacting the issuing institution repeatedly, verifiers can independently verify the credential using blockchain records.
+
+---
+
+### Lack of User Ownership
+
+Traditional systems store user credentials within institutional databases.
+
+Users often have little control over how their credentials are shared.
+
+PRO-DID gives users complete ownership of their decentralized identity and credentials.
+
+---
+
+### Trust Between Organizations
+
+Organizations often need to determine whether a credential truly originated from a trusted issuer.
+
+PRO-DID establishes trust through registered issuers and immutable blockchain records.
+
+---
+
+# Target Users
+
+The platform is designed for multiple participants within the identity ecosystem.
+
+## Individuals
+
+- Students
+- Employees
+- Professionals
+- Job Applicants
+
+Individuals own their decentralized identity and securely manage their credentials.
+
+---
+
+## Credential Issuers
+
+Trusted organizations such as:
+
+- Universities
+- Colleges
+- Companies
+- Government Departments
+- Certification Authorities
+- Training Institutes
+
+These organizations issue digitally verifiable credentials.
+
+---
+
+## Credential Verifiers
+
+Organizations responsible for verification, including:
+
+- Employers
+- HR Teams
+- Recruitment Agencies
+- Universities
+- Government Agencies
+- Licensing Authorities
+
+They can instantly verify credentials without contacting issuers.
+
+---
+
+# Project Objectives
+
+The project aims to:
+
+- Reduce background verification time.
+- Eliminate repetitive manual verification.
+- Detect document tampering.
+- Improve trust between organizations.
+- Give users ownership of their digital identity.
+- Enable secure credential sharing.
+- Provide transparent and immutable credential verification.
+
+---
+
+# Solution Approach
+
+The project follows a decentralized approach using blockchain technology.
+
+Instead of relying on centralized databases, credential metadata is securely stored on the blockchain while documents are stored on IPFS.
+
+During credential issuance:
+
+1. The issuer uploads the credential document to IPFS.
+2. The document's SHA-256 hash is generated.
+3. The IPFS Content Identifier (CID) and document hash are recorded on the blockchain.
+4. The credential becomes permanently verifiable.
+
+During verification:
+
+1. The verifier enters the Credential ID.
+2. The blockchain is queried.
+3. Credential existence is verified.
+4. Revocation status is checked.
+5. The original document is downloaded from IPFS.
+6. A new SHA-256 hash is generated.
+7. The newly generated hash is compared with the blockchain hash.
+8. The platform displays a verification report.
+
+This eliminates the need to contact the issuing organization.
+
+---
+
+# System Architecture
+
+```text
+                        +----------------------+
+                        |      Credential      |
+                        |      Verifier        |
+                        +----------+-----------+
+                                   |
+                                   |
+                          Search Credential
+                                   |
+                                   ▼
+                    +---------------------------+
+                    |      React Frontend       |
+                    +-------------+-------------+
+                                  |
+                  ------------------------------
+                  |                            |
+                  ▼                            ▼
+      Smart Contracts                 IPFS (Pinata)
+                  |                            |
+                  |                            |
+        Credential Metadata           Credential Document
+        DID Registry                  Original PDF
+        Issuer Registry
+        Credential Registry
+                  |
+                  ▼
+            Ethereum Blockchain
 ```
 
 ---
 
-## Project Structure
+# Workflow
 
-```
-did-wallet/
-├── src/
-│   ├── contracts/
-│   │   ├── DIDRegistry.sol
-│   │   ├── IssuerRegistry.sol
-│   │   └── CredentialRegistry.sol
-│   └── interfaces/
-│       ├── IDIDRegistry.sol
-│       └── IIssuerRegistry.sol
-├── test/
-│   ├── DIDRegistry.t.sol
-│   └── CredentialRegistry.t.sol
-├── script/
-│   └── Deploy.s.sol
-├── did-wallet-frontend/
-│   ├── src/
-│   │   ├── contracts/
-│   │   │   ├── abis.ts          # typed ABIs for all three contracts
-│   │   │   └── contractClient.ts # ethers v6 wrapper with sim fallback
-│   │   ├── context/
-│   │   │   └── WalletContext.tsx
-│   │   └── components/          # role-gated views
-│   └── .env.example
-├── Makefile                     # one-command local setup
-└── foundry.toml
+## Identity Creation
+
+```text
+User
+ │
+ ▼
+Connect Wallet
+ │
+ ▼
+Create DID
+ │
+ ▼
+Blockchain
 ```
 
 ---
 
-## Design Decisions
+## Credential Issuance
 
-**Why `did:wallet:` method?**
-The DID method namespace is intentionally custom. The contract owns the namespace prefix (`did:wallet:`) and callers supply the identifier segment. This keeps DIDs human-readable while ensuring global uniqueness within the registry.
+```text
+Issuer
+ │
+ ▼
+Upload Document
+ │
+ ▼
+IPFS (Pinata)
+ │
+ ▼
+Generate SHA-256
+ │
+ ▼
+Store CID + Hash
+ │
+ ▼
+Blockchain
+```
 
-**Why separate IssuerRegistry?**
-Decoupling issuer trust from credential issuance makes each contract independently testable and upgradeable. The CredentialRegistry only depends on the `IIssuerRegistry` interface — swapping the trust model doesn't require touching credential logic.
+---
 
-**Why IPFS + documentHash?**
-Full credential documents (JSON-LD) are stored off-chain on IPFS. Only the CID and a SHA-256 document hash are stored on-chain. Verifiers can independently fetch the document from IPFS and compare the hash to detect tampering without storing large blobs on-chain.
+## Credential Verification
 
-**Simulation mode**
-The frontend runs fully without MetaMask or a running node using localStorage. This makes the UI demonstrable anywhere and lets you explore all three roles without a Web3 setup.
+```text
+Verifier
+ │
+ ▼
+Enter Credential ID
+ │
+ ▼
+Blockchain Lookup
+ │
+ ▼
+Credential Exists?
+ │
+ ▼
+Revoked?
+ │
+ ▼
+Download Document from IPFS
+ │
+ ▼
+Compute SHA-256
+ │
+ ▼
+Compare Hash
+ │
+ ▼
+Verification Report
+```
+
+---
+
+# Technology Stack
+
+## Frontend
+
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+
+## Blockchain
+
+- Solidity
+- Foundry
+- Ethereum
+
+## Storage
+
+- IPFS
+- Pinata
+
+## Wallet
+
+- MetaMask
+
+## Cryptography
+
+- SHA-256
+- Web Crypto API
+
+---
+
+# Key Features
+
+- Decentralized Identity (DID)
+- Trusted Issuer Management
+- Credential Issuance
+- Credential Revocation
+- IPFS Document Storage
+- Blockchain-backed Credential Registry
+- Document Integrity Verification
+- Tamper Detection
+- Instant Background Verification
+- User-controlled Identity
+
+---
+
+# Real-World Impact
+
+PRO-DID significantly improves the efficiency of identity verification across various industries.
+
+### Recruitment
+
+Employers can verify candidate credentials within seconds instead of waiting days for manual verification.
+
+---
+
+### Higher Education
+
+Universities can issue digitally verifiable certificates that graduates can use throughout their careers.
+
+---
+
+### Government Services
+
+Government agencies can verify identity documents without relying on physical paperwork.
+
+---
+
+### Professional Licensing
+
+Professional certifications can be verified instantly by employers or regulatory authorities.
+
+---
+
+### Training & Certifications
+
+Training organizations can issue tamper-proof completion certificates.
+
+---
+
+# Expected Outcomes
+
+The platform aims to achieve the following outcomes:
+
+- Significant reduction in background verification time.
+- Lower verification costs.
+- Reduced document fraud.
+- Improved trust among organizations.
+- Secure digital identity ownership.
+- Faster hiring and admission processes.
+- Transparent credential verification.
+- Better user privacy and control.
+
+---
+
+# Future Enhancements
+
+The current implementation establishes the foundation for a decentralized identity ecosystem. Future enhancements include:
+
+- W3C Decentralized Identifier (DID) compliance
+- W3C Verifiable Credentials (VC)
+- Digital signatures for issuer authenticity
+- Zero-Knowledge Proof (ZKP) based selective disclosure
+- AI-assisted issuer reputation analysis
+- Decentralized issuer trust framework
+- Credential expiration and renewal
+- Wallet recovery mechanisms
+
+---
+
+# Conclusion
+
+PRO-DID demonstrates how blockchain technology can modernize traditional background verification by replacing slow, manual, and repetitive verification processes with secure, tamper-proof digital credentials. By combining Decentralized Identifiers (DIDs), blockchain, IPFS, and cryptographic hashing, the platform enables individuals to own their identity while allowing organizations to perform instant, trustworthy credential verification.
